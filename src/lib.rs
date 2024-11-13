@@ -1,7 +1,7 @@
 
 
 mod units;
-mod paper_format;
+mod page_format;
 mod page;
 use page::{Page};
 

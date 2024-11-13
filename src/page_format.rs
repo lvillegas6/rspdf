@@ -1,5 +1,6 @@
 use crate::units::Pt;
 
+#[derive(Debug)]
 pub struct PageSize {
     width: Pt,
     height: Pt,
@@ -7,7 +8,7 @@ pub struct PageSize {
 
 impl PageSize {
 
-    pub fn new(width: f32, height: f32) -> PageSize {
+    pub const fn new(width: f32, height: f32) -> PageSize {
         PageSize {
             width: Pt(width),
             height: Pt(height)
@@ -21,6 +22,10 @@ impl PageSize {
     pub fn height(&self) -> Pt {
         self.height
     }
+
+    pub fn set_width(&mut self, width: Pt) {
+        self.width = width;
+    }
 }
 
 const A4_SIZE: PageSize = PageSize::new(595.28, 841.89);
@@ -32,6 +37,7 @@ const JUNIOR_LEGAL_SIZE: PageSize = PageSize::new(576.0, 360.0);
 const LEDGER_SIZE: PageSize = PageSize::new(1224.0, 792.0);
 const TABLOID_SIZE: PageSize = PageSize::new(792.0, 1224.0);
 
+#[derive(Debug)]
 pub enum PageFormat {
     A4,
     A5,

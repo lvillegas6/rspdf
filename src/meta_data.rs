@@ -10,11 +10,11 @@ pub struct MetaData {
 }
 
 impl MetaData {
-    pub fn new(title: &str, version: f32, encryption: bool) -> MetaData {
+    pub fn new(title: &str, author: &str, version: f32) -> MetaData {
         MetaData {
             title: title.to_string(),
+            author: author.to_string(),
             version,
-            encryption,
             ..Self::default()
         }
     }

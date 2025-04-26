@@ -8,11 +8,13 @@ mod text;
 mod reference;
 mod line;
 mod types;
+mod font;
 
 use std::collections::HashMap;
-use std::io::Read;
+use std::io::{Read};
 use std::ops::Add;
 use page::{Page};
+use crate::font::Font;
 use crate::meta_data::MetaData;
 use crate::reference::Ref;
 
@@ -21,7 +23,7 @@ struct RsPdf {
     meta_data: MetaData,
     pages: Vec<Page>,
     current_id: u32,
-    fonts: HashMap<String, Ref>,
+    fonts: HashMap<String, Font>,
     current_font: u32,
     document: Vec<u8>,
     xref_offset: Vec<u32>,
@@ -59,8 +61,8 @@ impl RsPdf {
         }
     }
 
-    pub fn add_font(&mut self, data: &[u8]) -> String {
-        // optener el ultimo index para incremetar
+    pub fn add_font(&mut self, data: &[u8]) -> Result<String, String> {
+
         self.current_font += 1;
         let font_name = format!("F{}", self.current_font);
 
@@ -71,16 +73,24 @@ impl RsPdf {
         let font_file_obj_id: String = self.alloc_id().into();
 
 
-        let face = ttf_parser::Face::parse(data, 0).unwrap();
-
-        self.fonts.insert(font_name.clone(), font_obj_id);
+        let face = ttf_parser::Face::parse(data, 0)
+            .map_err(|_| "Error parsing font data".to_string())?;
 
         // /FontBBox [xMin yMin xMax yMax]
         let bbox = face.global_bounding_box();
 
         // /Ascent y /Descent
+        let units_per_em = face.units_per_em() as f32;
         let ascent = face.ascender();
         let descent = face.descender();
+        let height_in_font_units = (ascent - descent) as f32;
+
+        let font = Font {
+            font_ref: font_obj_id.clone(),
+            name: font_name.clone(),
+            height: height_in_font_units / units_per_em,
+        };
+        self.fonts.insert(font_name.clone(), font);
 
         let cap_height = face.capital_height().unwrap_or(ascent);
         let italic_angle = face.italic_angle();
@@ -113,7 +123,11 @@ impl RsPdf {
         self.document.extend_from_slice(b"\nendstream\nendobj\n");
         self.xref_offset.push(self.document.len() as u32);
 
-        font_name
+        Ok(font_name)
+    }
+
+    pub fn get_font(&self, font_name: &str) -> Option<&Font> {
+        self.fonts.get(font_name)
     }
 
     fn alloc_id(&mut self) -> Ref {
@@ -137,10 +151,8 @@ impl RsPdf {
 
         let mut fonts_dict = String::new();
         for (font_name, font_ref) in self.fonts.iter() {
-            fonts_dict.push_str(&format!("/{0} {1} 0 R ", font_name.replace(" ", ""), font_ref.id));
+            fonts_dict.push_str(&format!("/{0} {1} 0 R ", font_name.replace(" ", ""), font_ref.font_ref.id));
         }
-
-        println!("fonts_dict: {}", fonts_dict);
 
         for page in pages {
             let page_obj_id: String = self.alloc_id().into();
@@ -194,21 +206,24 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let mut file = File::create("mi_archivo.pdf").unwrap();
+        let mut file = File::create("template.pdf").unwrap();
         let mut pdf = RsPdf::new("My first PDF");
 
-        let font_name = pdf.add_font(include_bytes!("../assets/Helvetica.ttf"));
-        let other_font_name = pdf.add_font(include_bytes!("../assets/NotoSansMono.ttf"));
+        let font_name = pdf.add_font(include_bytes!("../assets/Helvetica.ttf")).unwrap();
+        let other_font_name = pdf.add_font(include_bytes!("../assets/NotoSansMono.ttf")).unwrap();
+
+        let font = pdf.get_font(&font_name).unwrap();
+        let other_font = pdf.get_font(&other_font_name).unwrap();
 
         let mut page = Page::new(OrientationType::Portrait, PageFormat::A4.get_format());
         let page_height = page.size().height_value();
-        page.add_content(Text::new("Hello World!", other_font_name.as_str(), 16, Point(0.0, page_height - 60.0), RGB(87, 150, 100)).into());
-        page.add_content(Text::new("Other Hello World!", font_name.as_str(), 16, Point(0.0, page_height - 30.0), RGB(74, 7, 7)).into());
+        page.add_content(Text::new("Hello World!", font, 100, Point(0.0, page_height - 60.0), RGB(87, 150, 100)).into());
+        page.add_content(Text::new("Other Hello World!", other_font, 32, Point(0.0, page_height), RGB(74, 7, 7)).into());
         page.add_content(Line::new(Point(20.0, 200.0), Point(page.size().width_value() - 20.0, 200.0), RGB(0, 0, 0), 1.0).into());
 
         let mut page_tabloid = Page::new(OrientationType::Portrait, PageFormat::Tabloid.get_format());
         let page_tabloid_height = page_tabloid.size().height_value();
-        page_tabloid.add_content(Text::new("Hello", font_name.as_str(), 42, Point(100.0, page_tabloid_height - 700.0), RGB(87, 150, 100)).into());
+        page_tabloid.add_content(Text::new("Hello", font, 32, Point(100.0, page_tabloid_height - 700.0), RGB(87, 150, 100)).into());
         page_tabloid.add_content(Line::new(Point(20.0, 200.0), Point(page.size().width_value() - 20.0, page_tabloid_height - 700.0), RGB(0, 0, 0), 1.0).into());
 
         pdf.add_page(page);

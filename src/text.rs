@@ -1,17 +1,18 @@
+use std::rc::Rc;
 use crate::types::{Point, RGB};
 use crate::Font;
 
-pub struct Text<'a> {
+pub struct Text {
     pub text: String,
     //use struct Font
-    pub font: &'a Font,
+    pub font: Rc<Font>,
     pub size: i32,
     pub point: Point,
     pub color: RGB,
 }
 
-impl Text<'_> {
-    pub fn new<'a>(text: &str, font: &'a Font, size: i32, point: Point, color: RGB) -> Text<'a> {
+impl Text {
+    pub fn new(text: &str, font: Rc<Font>, size: i32, point: Point, color: RGB) -> Text {
         Text {
             text: text.to_string(),
             font,
@@ -20,7 +21,7 @@ impl Text<'_> {
             color,
         }
     }
-    pub fn new_with_default_color<'a>(text: &str, font: &'a Font, size: i32, point: Point) -> Text<'a> {
+    pub fn new_with_default_color(text: &str, font: Rc<Font>, size: i32, point: Point) -> Text {
         Text {
             text: text.to_string(),
             font,
@@ -31,7 +32,7 @@ impl Text<'_> {
     }
 }
 
-impl From<Text<'_>> for Vec<u8> {
+impl From<Text> for Vec<u8> {
     fn from(content: Text) -> Vec<u8> {
         let r = content.color.0 as f32 / 255.0;
         let g = content.color.1 as f32 / 255.0;

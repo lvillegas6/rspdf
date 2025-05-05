@@ -22,7 +22,7 @@ use crate::reference::Ref;
 #[derive(Debug)]
 struct RsPdf {
     meta_data: MetaData,
-    pages: Vec<Page>,
+    pages: Option<Vec<Page>>,
     current_id: u32,
     fonts: HashMap<String, Rc<Font>>,
     current_font: u32,
@@ -41,7 +41,7 @@ impl RsPdf {
         let version = meta_data.version;
         RsPdf {
             meta_data,
-            pages: Vec::new(),
+            pages: Option::None,
             current_id: 1,
             current_font: 0,
             document: Vec::from(format!("%PDF-{}\n", version)),
@@ -53,7 +53,7 @@ impl RsPdf {
     pub fn new_with_meta_data(meta_data: MetaData) -> RsPdf {
         RsPdf {
             meta_data,
-            pages: Vec::new(),
+            pages: Option::None,
             current_id: 1,
             current_font: 0,
             document: Vec::new(),
@@ -136,26 +136,32 @@ impl RsPdf {
         self.current_id += 1;
         Ref::new(id)
     }
-    pub fn add_page(&mut self, page: Page) {
-        self.pages.push(page);
+    pub fn add_page(self: &mut Self, page: Page) {
+        if self.pages.is_none() {
+            self.pages = Some(vec![]);
+        }
+        if let Some(ref mut pages) = self.pages {
+            pages.push(page);
+        }
     }
 
-    pub fn build(&mut self) -> Vec<u8> {
+    pub fn build(self: &mut Self) -> Vec<u8> {
 
         let catalog_obj_id: String = self.alloc_id().into();
         let pages_obj_id: String = self.alloc_id().into();
         self.document.extend_from_slice(format!("{} obj\n<< /Type /Catalog /Pages {} R >>\nendobj\n", catalog_obj_id, pages_obj_id).as_bytes());
         self.xref_offset.push(self.document.len() as u32);
         let mut kids: Vec<String> = vec![];
-        let page_length = self.pages.len();
-        let pages = self.pages.clone();
+        let page = self.pages.take().unwrap();
+
+        let page_length = page.len() as i32;
 
         let mut fonts_dict = String::new();
         for (font_name, font_ref) in self.fonts.iter() {
             fonts_dict.push_str(&format!("/{0} {1} 0 R ", font_name.replace(" ", ""), font_ref.font_ref.id));
         }
 
-        for page in pages {
+        for page in page {
             let page_obj_id: String = self.alloc_id().into();
             kids.push(page_obj_id.clone().add(" R"));
             let page_size = page.size();
